@@ -1,42 +1,34 @@
-# Como instalar/configurar/usar o `shell scripts` no `Linux Ubuntu`
+# Como instalar/configurar/usar o `fastfetch` no Linux Ubuntu
 
 ## Resumo
 
-Guia direto para instalar o `shell scripts` no seu projeto.
+Guia para instalar, verificar, configurar, usar e remover o `fastfetch` no `Linux Ubuntu`.
 
 ## _Abstract_
 
-_A straightforward guide to installing `shell scripts` in your project._
-
+_A guide to install, verify, configure, use, and remove `fastfetch` on `Ubuntu Linux`._
 
 ## Descrição
 
-### `shell scripts`
-
-O `shell scripts` é um repositório do `GitHub` para consolidar códigos genéricos em `shell` para
-serem utilizados em qualquer outro projeto. Ele também inclui um _script_ chamado `prepare_repo.sh`
-que clona outros repos dentro do seu projeto com demais códigos genéricos em diversas linguagens e
-arquivos que são convenientes existirem em projetos.
-
+O `fastfetch` coleta informações do sistema e as apresenta no `Terminal Emulator`. O projeto é escrito principalmente em `C`. Este guia baixa o pacote oficial `.deb` do projeto `fastfetch-cli/fastfetch` com `curl` e o instala globalmente usando `apt`.
 
 ## Pré-requisitos
 
-- `Git` instalado
-- `SSH key` configurada no `GitHub`
-- Acesso ao `GitHub` (repositório `edftechnology/shell_scripts`)
+- `Linux Ubuntu` compatível com os pacotes oficiais (Ubuntu 20.04 ou superior, conforme o projeto).
+- Arquitetura `amd64` ou `arm64`; conexão com a internet.
+- `curl`, `apt`, `dpkg` e `ca-certificates` disponíveis.
+- `sudo` para instalar e remover o pacote.
+- Identificar qualquer `fastfetch` preexistente antes de instalar; interromper se sua origem não for conhecida.
 
+## 1. Instalação
 
-## 1. Clonar o repo `shell scripts` no repositório do seu projeto
+O procedimento usa os pacotes `.deb` oficiais do projeto e instala com `apt`, que resolve dependências e mantém os arquivos sob gerenciamento do sistema. O endereço de _download_ `latest` não fixa uma versão; conferir a versão e os ativos na página oficial de lançamentos.
 
-Para clonar o `shell scripts`, siga os passos abaixo:
-
-1. Abrir o `Terminal Emulator`. Você pode fazer isso pressionando:
+1. Abrir o `Terminal Emulator`. Atalho de teclado:
 
     ```bash
     Ctrl + Alt + T
     ```
-
-
 
 2. Certifique-se de que seu sistema esteja limpo e atualizado.
 
@@ -82,245 +74,194 @@ Para clonar o `shell scripts`, siga os passos abaixo:
 
 
 
-3. Acessar a pasta do seu projeto:
+Os comandos de manutenção do item 2 foram preservados do template. Eles não são pré-requisitos do `fastfetch`; `apt autoremove -y`, `apt --fix-broken install` e `apt full-upgrade -y` podem remover, reparar ou atualizar pacotes do sistema. Revisar cada ação e seus efeitos antes de executá-la.
+
+3. Verificar a distribuição, arquitetura e instalação existente. Se já houver um comando, identificar sua origem com `type -a` e `dpkg-query -S`; resolver conflitos antes de instalar.
 
     ```bash
-    cd <caminho_ate_o_projeto>
+    . /etc/os-release
+    printf '%s %s\n' "$NAME" "$VERSION_ID"
+    dpkg --print-architecture
+    command -v fastfetch || true
+    type -a fastfetch 2>/dev/null || true
+    if command -v fastfetch >/dev/null 2>&1; then
+        dpkg-query -S "$(readlink -f "$(command -v fastfetch)")" || true
+    fi
     ```
 
-4. Clonar o `shell scripts`:
+4. Selecionar o ativo conforme a arquitetura (`amd64` para `x86_64`, `arm64` para `aarch64`):
 
     ```bash
-    git submodule add \
-        git@github.com:edftechnology/shell_scripts.git \
-        subs/submodules/shell_scripts
+    case "$(dpkg --print-architecture)" in
+        amd64) asset=fastfetch-linux-amd64.deb ;;
+        arm64) asset=fastfetch-linux-aarch64.deb ;;
+        *) printf 'Arquitetura não coberta.\n' >&2; exit 1 ;;
+    esac
     ```
 
+5. Criar um diretório temporário exclusivo e baixar o ativo oficial com `curl`:
 
-## 1.1 Código completo para configurar/instalar/usar
+    ```bash
+    download_dir="$(mktemp -d)"
+    curl -fL --output "$download_dir/$asset" \
+        "https://github.com/fastfetch-cli/fastfetch/releases/latest/download/$asset"
+    ```
 
-Para configurar/instalar/usar o `shell scripts` no `Linux Ubuntu` sem precisar digitar linha por linha, você pode seguir estas etapas:
+6. Instalar o arquivo `.deb` com `apt`. Isso requer `sudo`; o download não requer privilégios. Os arquivos ficam nos diretórios administrados pelo `dpkg`/`apt`, sem cópia manual para `/usr/bin` ou `/usr/local/bin`:
 
-1. Abrir o `Terminal Emulator`. Você pode fazer isso pressionando:
+    ```bash
+    sudo apt install "$download_dir/$asset"
+    ```
+
+7. Remover o arquivo baixado e o diretório temporário após a instalação bem-sucedida e confirmar a versão:
+
+    ```bash
+    rm -- "$download_dir/$asset"
+    rmdir -- "$download_dir"
+    fastfetch --version
+    ```
+
+### 1.1 Código completo para configurar/instalar/usar
+
+1. Abrir o `Terminal Emulator`. Atalho de teclado:
 
     ```bash
     Ctrl + Alt + T
     ```
 
-2. Digite o seguinte comando e pressione `Enter`:
+2. Copiar e colar o bloco no terminal. O bloco seleciona a arquitetura suportada, baixa o pacote oficial para um diretório temporário exclusivo, instala-o e mostra a versão. Antes, identificar a origem de qualquer instalação preexistente.
 
     ```bash
-    sudo apt clean
-    sudo apt autoclean
-    sudo apt autoremove -y
-    sudo apt update
-    sudo apt --fix-broken install
-    sudo apt clean
-    sudo apt list --upgradable
-    sudo apt full-upgrade -y
-    cd <caminho_ate_o_projeto>
-    git submodule add git@github.com:edftechnology/shell_scripts.git subs/submodules/shell_scripts
-    git submodule update --init --recursive
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh
+    set -eu
+    download_dir="$(mktemp -d)"
+    trap 'rm -rf -- "$download_dir"' EXIT
+    case "$(dpkg --print-architecture)" in
+        amd64) asset=fastfetch-linux-amd64.deb ;;
+        arm64) asset=fastfetch-linux-aarch64.deb ;;
+        *) printf 'Arquitetura não coberta.\n' >&2; exit 1 ;;
+    esac
+    curl -fL --output "$download_dir/$asset" \
+        "https://github.com/fastfetch-cli/fastfetch/releases/latest/download/$asset"
+    sudo apt install "$download_dir/$asset"
+    fastfetch --version
+    fastfetch
     ```
 
+## 2. Verificação da instalação
 
-## 2. Inicializar `submodules` existentes (se aplicável)
+1. Verificar resolução no `PATH`, propriedade do arquivo, versão e ajuda. A saída varia conforme o sistema; nenhuma saída de exemplo é presumida.
 
-1. Abrir o `Terminal Emulator`. Você pode fazer isso pressionando:
+    ```bash
+    command -v fastfetch
+    type -a fastfetch
+    dpkg-query -S "$(readlink -f "$(command -v fastfetch)")"
+    fastfetch --version
+    fastfetch --help
+    ```
+
+    O esperado é que o comando seja encontrado, pertença ao pacote `fastfetch` e termine sem erro. A existência do arquivo, por si só, não comprova funcionamento.
+
+## 3. Configuração e utilização
+
+- Executar `fastfetch` para exibir informações do sistema.
+- Consultar opções com `fastfetch --help`; elas variam conforme a versão.
+- Usar `fastfetch --gen-config` para iniciar o gerador interativo disponível nas versões recentes; por padrão, a configuração é salva em `~/.config/fastfetch/config.jsonc`.
+- Revisar configurações obtidas de terceiros antes de usá-las: o módulo `Command` pode executar comandos de shell. A saída também pode conter informações de rede; revisar antes de compartilhá-la.
+- Consultar os caminhos reconhecidos com `fastfetch --list-config-paths`.
+- Para atualizar, baixar o ativo novo e reinstalar com `apt`; conferir os lançamentos, pois `latest` não fixa versão.
+
+## 4. Desinstalação
+
+Este procedimento vale somente para o pacote instalado por `apt`. Não use `apt remove` para binários manuais em `/usr/local/bin`, instalações em `/opt` ou arquivos de outra origem.
+
+1. Confirmar caminho, propriedade e estado do pacote:
+
+    ```bash
+    command -v fastfetch
+    type -a fastfetch
+    dpkg-query -S "$(readlink -f "$(command -v fastfetch)")"
+    dpkg-query -W -f='${Package} ${Version} ${db:Status-Abbrev}\n' fastfetch
+    ```
+
+2. Se a origem for o pacote `fastfetch`, removê-lo:
+
+    ```bash
+    sudo apt remove fastfetch
+    ```
+
+3. Verificar se o pacote ou outro comando homônimo permanece:
+
+    ```bash
+    dpkg-query -W -f='${Package} ${Version} ${db:Status-Abbrev}\n' fastfetch 2>/dev/null || true
+    command -v fastfetch || true
+    type -a fastfetch 2>/dev/null || true
+    ```
+
+`apt remove` pode deixar configuração do sistema em estado residual. `apt purge fastfetch` também remove esses arquivos; inspecione e decida antes de usá-lo. Configurações pessoais em `~/.config/fastfetch/` e dependências compartilhadas não são removidas por este procedimento.
+
+### 4.1 Código completo para desinstalar
+
+1. Abrir o `Terminal Emulator`. Atalho de teclado:
 
     ```bash
     Ctrl + Alt + T
     ```
 
-2. Clonar um repo com `submodules` com referência circular ou **NÃO**:
+2. Copiar e colar o bloco. Ele só chama `apt remove` se o `dpkg` indicar que `fastfetch` está instalado; depois verifica se ainda há um comando no `PATH`.
 
     ```bash
-    git clone --depth 1 -b <branch> <repo>
-    cd <repo>
-    git submodule update --init --depth 1
+    if dpkg-query -W -f='${db:Status-Abbrev}' fastfetch 2>/dev/null | grep -q '^ii'; then
+        sudo apt remove fastfetch
+    else
+        printf 'Pacote fastfetch não instalado pelo dpkg; nenhuma remoção feita.\n'
+    fi
+    dpkg-query -W -f='${Package} ${Version} ${db:Status-Abbrev}\n' fastfetch 2>/dev/null || true
+    command -v fastfetch || true
+    type -a fastfetch 2>/dev/null || true
     ```
 
-3. Se o seu repositório já tiver um `.gitmodules`, inicialize com:
+## 5. Submódulos e preparação do repositório
 
-    ```bash
-    git submodule update --init --recursive
-    ```
+Clonar o código-fonte, adicionar submódulos ou executar `prepare_repo.sh` não é necessário para instalar ou utilizar o aplicativo. Os submódulos deste checkout pertencem à estrutura de desenvolvimento e não integram o procedimento de instalação do `fastfetch`.
 
+## 6. Instalação global e local de executáveis
 
-## 3. (Opcional) Executar o `prepare_repo.sh`
+A instalação é global e gerenciada por `apt`. Não copiar os arquivos do pacote para `/usr/local/bin` nem movê-los dos diretórios gerenciados. Uma instalação em `~/.local/bin` não é necessária neste método. `command -v fastfetch` verifica a resolução pelo `PATH`; `type -a fastfetch` revela possíveis homônimos.
 
-1. É conveniente executar o `scripts/prepare_repo.sh` depois de clonar o `shell scripts`,
-pois ele verifica se o seu repo está com todos os arquivos que é recomendado que um projeto
-tenha. Arquivos existentes e divergentes só são substituídos após confirmação; o `.gitignore` é
-complementado com regras ausentes, sem remover regras locais. Para isso, na raiz do seu projeto,
-execute o comando:
+## 7. Compatibilidade
 
-    ```bash
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh
-    ```
+O projeto publica pacotes para `amd64` e `aarch64` e indica Ubuntu 20.04 ou superior para o pacote Debian/Ubuntu. Este guia cobre somente essas arquiteturas. As versões Ubuntu que já incluem `fastfetch` em seus repositórios podem disponibilizar versão diferente. Verificar a versão instalada com `fastfetch --version`; não se presume compatibilidade com outras distribuições.
 
-2. Se quiser escolher explicitamente o tipo de estrutura a preparar, use `--profile`:
+## 8. Licença
 
-    ```bash
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh --profile app
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh --profile app-latex
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh --profile latex
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh --profile latex --force
-    ```
+O projeto oficial `fastfetch-cli/fastfetch` declara licença MIT. Consultar o arquivo `LICENSE` upstream para os termos completos. O `LICENSE.txt` deste checkout contém metadados de outro contexto e não foi tratado como licença do `fastfetch`.
 
-    Os perfis disponíveis são:
+## 9. Contato e suporte
 
-    - `app`: prepara a estrutura padrão de aplicação, com diretórios como `data`, `inputs`, `outputs`, `scripts`, `tests` e `venvs`.
-    - `app-latex`: combina a estrutura de aplicação com a estrutura típica de projetos `LaTeX`.
-    - `latex`: prepara apenas a estrutura esperada para projetos `LaTeX`, com diretórios como `figures`, `referencesbibliograficas`, `tables`, `docs/references` e `docs/.references`.
+Consultar o repositório oficial `fastfetch-cli/fastfetch` no `GitHub` para documentação, lançamentos e suporte. Ao relatar um problema, informar a versão, distribuição e arquitetura, sem incluir dados pessoais exibidos pelo aplicativo.
 
-    `--force` substitui arquivos divergentes copiados das fontes padrão sem solicitar confirmação. Ele não remove diretórios, não força atualizações/reset de submódulos e não substitui o `.gitignore`: as regras deste arquivo são sempre complementadas, preservando as regras locais.
+## 10. Referências
 
-    `--yes` e `-y` são aliases: confirmam as ações que solicitam confirmação durante a preparação. Diferentemente de `--force`, eles também podem confirmar operações não relacionadas à substituição de arquivos.
+[1] FASTFETCH CLI.
+**Fastfetch**.
+Disponível em: <https://github.com/fastfetch-cli/fastfetch>.
+GitHub.
+Acessado em: 04/11/2026.
 
-    No perfil `latex`, o `.gitignore` mantém trackáveis os PDFs com nomes `main*.pdf`, para que a saída compilada possa ser consultada mesmo quando a fonte atual não compila. Para sincronizar os repositórios Git aninhados antes da preparação, use `--sync-repositories`; a sincronização publica commits locais apenas quando a árvore está limpa, aplica somente fast-forward e interrompe ao encontrar alterações não commitadas ou histórico divergente.
+[2] FASTFETCH CLI.
+**Releases**.
+Disponível em: <https://github.com/fastfetch-cli/fastfetch/releases>.
+GitHub.
+Acessado em: 04/11/2026.
 
-3. Se um perfil já tiver sido aplicado e você executar outro perfil, o `prepare_repo.sh` troca o perfil de forma conservadora. Por exemplo, se você executou `--profile app` por engano e depois executar `--profile latex`, ele remove os artefatos seguros do perfil `app` antes de aplicar o perfil `latex`, como se o perfil `app` não tivesse sido a escolha final. Diretórios não vazios e arquivos modificados são preservados para evitar perda de trabalho.
+[3] FASTFETCH CLI.
+**Licença**.
+Disponível em: <https://github.com/fastfetch-cli/fastfetch/blob/dev/LICENSE>.
+GitHub.
+Acessado em: 04/11/2026.
 
-    ```bash
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh --profile app
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh --profile latex
-    ```
-
-4. Para desfazer explicitamente uma preparação, use `undo`. Antes de remover qualquer coisa, é recomendável inspecionar com `--dry-run`:
-
-    ```bash
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh undo --profile app --dry-run --yes
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh undo --profile app
-    ```
-
-    Em execuções feitas com versões recentes do script, ele grava um snapshot Git antes de alterar o repositório. Nesses casos, também é possível desfazer via Git:
-
-    ```bash
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh undo --revert
-    bash subs/submodules/shell_scripts/scripts/prepare_repo.sh undo --hard
-    ```
-
-    Use `--revert` para criar commit(s) de reversão mantendo o histórico. Use `--hard` apenas quando quiser voltar o índice e a árvore de trabalho exatamente ao snapshot anterior à última execução do `prepare_repo.sh`.
-
-5. Quando o comando é executado em um `Terminal Emulator` interativo sem `--profile`, ele pergunta qual perfil deve usar. Em contexto não interativo, o padrão atual é `app`.
-
-    Ao iniciar em `Terminal Emulator` interativo, o `prepare_repo.sh` também verifica periodicamente se o submódulo `shell_scripts` está atrás do remoto. Se estiver, ele mostra um aviso no estilo:
-
-    ```bash
-    [shell_scripts] A newer version is available. Would you like to update now? [Y/n]
-    ```
-
-    O padrão é `N`: `Enter` ou `n` continuam a execução normalmente sem atualizar. Se o usuário responder `y`, `yes`, `1`, `true` ou `on`, o script executa `git pull --ff-only`, reinicia o próprio `prepare_repo.sh` e segue já com a versão nova. Em contexto sem `TTY`, ele não pergunta e mostra apenas o aviso de que há versão mais nova disponível. Para desativar essa checagem, defina `SHELL_SCRIPTS_UPDATE_CHECK=0`.
-
-6. O _script_ faz, de forma resumida:
-
-    - Garante/atualiza submodules essenciais
-    - Cria pastas padrão do projeto de acordo com o perfil selecionado
-    - Cria `__init__.py` onde for apropriado
-    - Nos perfis `latex` e `app-latex`, grava `.prepare_repo_profile` com o perfil aplicado
-    - Nos perfis `latex` e `app-latex`, gera `.lso_preserve_local`, usado pelo `latex_synchronizer_with_overleaf` durante `--prune-local`
-    - Grava um snapshot Git para permitir `prepare_repo.sh undo --revert` ou `prepare_repo.sh undo --hard` em execuções futuras
-
-    Em preparação normal, `--dry-run` não aplica o perfil nem altera arquivos ou metadados Git. Como a preparação pode envolver submódulos e arquivos externos, essa opção informa que nenhuma alteração foi feita; a prévia detalhada fica disponível para as operações `undo` compatíveis.
-
-
-## 4. Governança documental mínima
-
-Para projetos analíticos, modelos, automações críticas ou ambientes regulados, recomenda-se manter no `README.ipynb` apenas um resumo de governança suficiente para orientar instalação, reprodução e manutenção. A documentação técnica completa deve ficar em arquivos específicos do projeto.
-
-### Versões do ambiente tecnológico
-
-| Componente | Versão/Comando | Observação |
-| --- | --- | --- |
-| `Git` | `git --version` | Controle de versão e submodules |
-| `Bash` | `bash --version` | Execução do `prepare_repo.sh` |
-| `Python` | `python3 --version` | Conversões, notebooks e scripts auxiliares |
-| `Jupyter` | `jupyter --version` | Edição/execução do `README.ipynb`, quando aplicável |
-| Submodules | `git submodule status` | Versões dos repositórios auxiliares |
-
-### Checklist documental
-
-- Objetivo, uso previsto, escopo e público-alvo do projeto
-- Responsáveis por desenvolvimento, uso, revisão e aprovação
-- Fontes de dados, premissas, limitações, entradas e saídas esperadas
-- Testes, validações, critérios de aceite, monitoramento e evidências relevantes
-- Riscos operacionais conhecidos e plano de contingência para falhas de execução, dados ou dependências
-- Histórico de versões, motivo da mudança, responsável e data
-
-## Sincronizar repositórios Git
-
-O script `scripts/sync_repositories.sh` aceita a opção `--directory DIRECTORY` para
-indicar a pasta que contém os repositórios. Sem essa opção, usa o diretório atual.
-Por exemplo, a partir da raiz do checkout `unix`:
-
-```bash
-bash ubuntu/shell_scripts/scripts/sync_repositories.sh --directory .
-```
-
-Para selecionar outra pasta explicitamente, informe o caminho depois de `--directory`:
-
-```bash
-bash ubuntu/shell_scripts/scripts/sync_repositories.sh --directory /caminho/para/repositorios
-```
-
-O script percorre repositórios aninhados sob a pasta selecionada. Por padrão, a sincronização é conservadora: worktrees sujas ficam intactas e causam aviso de falha; commits locais à frente são enviados; commits remotos à frente são integrados apenas por fast-forward; históricos divergentes são reportados sem stash, rebase ou reset. `--hard-reset` seleciona o comportamento legado de stash e reset e deve ser usado somente quando essa substituição local for intencional.
-
-Para atualizar checkouts de submódulos padrão, use `scripts/update_named_repositories.sh`.
-Sem `--name`, o script procura `agents`, `codex_configuration_scripts`,
-`gemini_configuration_scripts`, `git_scripts`, `markdown_scripts`, `python_scripts`,
-`shell_scripts` e `txt_scripts`. A busca exclui diretórios `.git` e backups da sincronização:
-
-```bash
-bash subs/submodules/shell_scripts/scripts/update_named_repositories.sh
-```
-
-Use `--directory ROOT` para definir a raiz e `--name NAME` para limitar a busca a um nome.
-A busca
-é recursiva para alcançar submódulos aninhados, mas só atualiza diretórios que sejam a raiz
-de um checkout Git independente. Pastas comuns e diretórios internos são ignorados e
-contabilizados no resumo final. Submódulos em `detached HEAD` seguem o commit registrado pelo
-repositório pai; o script só altera um submódulo limpo quando seu checkout não corresponde ao
-gitlink do pai.
-O script segue o upstream configurado em cada checkout; se não houver upstream, usa
-`origin/main` por padrão, que pode ser alterado com `--branch BRANCH`. Worktrees sujas,
-branches destacadas e históricos divergentes ficam intactos; commits locais à frente não
-são enviados. Checkouts independentes no mesmo nível são processados em paralelo, usando até
-o número de CPUs disponíveis informado por `nproc` (ou `getconf` como fallback); níveis
-aninhados são processados em sequência para preservar a ordem entre repositórios pais e
-submódulos. O código de saída é diferente de zero se algum checkout precisar de atenção.
-
-### Clonar e preparar `shell_scripts` como submodule
-
-Execute a sequência a partir da raiz do repositório que deve receber o submodule,
-somente quando `subs/submodules/shell_scripts` ainda não estiver configurado:
-
-```bash
-gitsubmoduleaddshellscripts
-sleep 10
-bash subs/submodules/shell_scripts/scripts/prepare_repo.sh --profile latex
-```
-
-O primeiro comando é um alias do shell que adiciona/clona o submodule; o intervalo
-permite a conclusão da operação antes de `prepare_repo.sh` ajustar o repositório.
-
-
-## Compatibilidade
-
-- Testado em Linux Ubuntu (recomendado 20.04+).
-- Deve funcionar em Debian e WSL, desde que o Git e o Bash estejam disponíveis.
-
-
-## Licença
-
-Este repositório inclui o arquivo `LICENSE.txt`.
-
-## Contato e suporte
-
-Para dúvidas ou problemas, abra uma issue no repositório do `GitHub`.
-
-
-## Referências
-
-[1] OPENAI. **Instalar o shell scripts no linux ubuntu pelo terminal emulator**. Disponível em: <https://chatgpt.com/c/shell-scripts>. ChatGPT. Acessado em: 02/04/2026.
+[4] OPENAI.
+**Instalar o `fastfetch` no `Linux Ubuntu` pelo `Terminal Emulator`**.
+Disponível em: <https://chatgpt.com/g/g-p-6980caf949648191ad6acfcdbe590f9e-instalar/c/6aeb8ed1-8878-83e9-ad2a-4f5d64fbec25>.
+ChatGPT. Link fornecido pelo usuário; o conteúdo não pôde ser acessado nesta sessão.
+Acessado em: 04/11/2026.
